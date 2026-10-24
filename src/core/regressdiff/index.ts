@@ -22,3 +22,6 @@ export * from './policy.ts';
 export * from './report/json.ts';
 export * from './report/markdown.ts';
 export * from './stats/index.ts';
+export * from './benchmark/methods.ts';
+export * from './benchmark/metrics.ts';
+export * from './benchmark/support.ts';
