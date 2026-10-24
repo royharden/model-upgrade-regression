@@ -17,9 +17,10 @@ import { evaluatePolicy, type PolicyDecision } from './policy.ts';
 import { createReport, type MigrationReport } from './report/json.ts';
 import defaultPolicy from '../../../fixtures/policy.json';
 import { PolicySchema } from './schema/policy.ts';
+import { semanticReviews, type SemanticReview } from './semantic/slot.ts';
 
 export interface CompareInput { suite: unknown; samples: readonly Sample[]; run_id: string; args: RunArgs; owner_id: string; rulings?: readonly RulingEvent[]; manifest?: RunManifest; policy?: unknown }
-export interface Comparison { suite: Suite; manifest: RunManifest; cells: Cell[]; findings: EvidenceFinding[]; orphaned_rulings: RulingEvent[]; ruling_audit: RulingEvent[]; stats: SuiteStatistics; decision: PolicyDecision; report: MigrationReport }
+export interface Comparison { suite: Suite; manifest: RunManifest; cells: Cell[]; findings: EvidenceFinding[]; semantic_reviews: SemanticReview[]; orphaned_rulings: RulingEvent[]; ruling_audit: RulingEvent[]; stats: SuiteStatistics; decision: PolicyDecision; report: MigrationReport }
 export function createManifest(suite: Suite, run_id: string, args: RunArgs): RunManifest {
   const config = ModelsSchema.parse(modelsJson);
   const old = config.models.find((model) => model.id === args.old_model), next = config.models.find((model) => model.id === args.new_model);
@@ -39,7 +40,8 @@ export function compare(input: CompareInput): Comparison {
     manifest.suite_sha256 !== sha256(canonical(suite)) || manifest.normalisation_version !== NORMALISATION_VERSION ||
     manifest.canonical_version !== CANONICAL_VERSION || manifest.verdict_rule_version !== VERDICT_RULE_VERSION) throw new Error('Manifest does not match requested comparison/engine');
   const cells: Cell[] = [];
-  for (const pair of pairSamples(suite, input.samples, input.run_id, args.k)) for (const check of pair.task.checks) {
+  const pairs = pairSamples(suite, input.samples, input.run_id, args.k);
+  for (const pair of pairs) for (const check of pair.task.checks) {
     const evaluate = (side: 'old' | 'new') => pair.samples.map((item) => {
       const sample = item[side], model = side === 'old' ? manifest.old_model : manifest.new_model;
       return { sample, result: sample.output ? runCheck(check, sample.output, { check_prices: model.check_prices ?? model.prices }) : recordedError(sample) };
@@ -52,15 +54,17 @@ export function compare(input: CompareInput): Comparison {
   const base = findingsFromCells(cells, true).filter((finding) => finding.verdict !== 'UNCHANGED' ||
     (policy.always_blocking.includes(finding.check_type) && finding.cell.new_counts.fail > 0 &&
       finding.cell.old_counts.pass * 2 > finding.cell.old_counts.pass + finding.cell.old_counts.fail));
-  const replay = replayRulings(input.owner_id, base.map((finding) => finding.id), input.rulings ?? []);
+  const semanticBase = semanticReviews(pairs);
+  const replay = replayRulings(input.owner_id, [...base.map((finding) => finding.id), ...semanticBase.map((item) => item.id)], input.rulings ?? []);
+  const semantic_reviews = semanticBase.map((item) => ({ ...item, current_ruling: replay.effective[item.id] ?? null }));
   const evidenced = base.map((finding) => attachEvidence({ ...finding, current_ruling: replay.effective[finding.id] ?? null }));
   const stats = calculateSuiteStatistics({ suite, manifest, cells });
-  const decision = evaluatePolicy({ policy, manifest, cells, findings: evidenced });
+  const decision = evaluatePolicy({ policy, manifest, cells, findings: evidenced, semantic_reviews });
   const blockCausing = new Set(decision.block_causing_ids);
   // Waivers change effective policy/badges, while ranking retains the unwaived blocking priority.
   const orderingBlockCausing = new Set(evaluatePolicy({ policy, manifest, cells,
     findings: evidenced.map((finding) => ({ ...finding, current_ruling: null })) }).block_causing_ids);
   const findings = sortFindings(evidenced.map((finding) => ({ ...finding, block_causing: blockCausing.has(finding.id) })), decision.raw_policy.always_blocking, orderingBlockCausing);
-  const report = createReport({ manifest, stats, decision, findings, cells, orphaned_rulings: replay.orphaned, ruling_audit: replay.audit });
-  return { suite, manifest, cells, findings, stats, decision, report, orphaned_rulings: replay.orphaned, ruling_audit: replay.audit };
+  const report = createReport({ manifest, stats, decision, findings, cells, semantic_reviews, orphaned_rulings: replay.orphaned, ruling_audit: replay.audit });
+  return { suite, manifest, cells, findings, semantic_reviews, stats, decision, report, orphaned_rulings: replay.orphaned, ruling_audit: replay.audit };
 }

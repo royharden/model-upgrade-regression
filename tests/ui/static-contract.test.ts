@@ -14,7 +14,7 @@ describe('offline review surface source boundaries', () => {
     const source = sources(root).join('\n');
     expect(source).not.toMatch(/dangerouslySetInnerHTML|\.innerHTML\s*=|\beval\s*\(/u);
     const offline = ['App.tsx', 'pages/Setup.tsx', 'pages/Run.tsx', 'pages/Findings.tsx', 'pages/Finding.tsx', 'pages/Report.tsx',
-      'components/CostBar.tsx', 'components/EstimatePanel.tsx', 'components/RulingButtons.tsx'].map((path) => readFileSync(join(root, path), 'utf8')).join('\n');
+      'pages/SemanticFinding.tsx', 'components/CostBar.tsx', 'components/EstimatePanel.tsx', 'components/RulingButtons.tsx'].map((path) => readFileSync(join(root, path), 'utf8')).join('\n');
     expect(offline).not.toMatch(/\bfetch\s*\(|from\s+['"][^'"]*supabase/u);
     expect(readFileSync(join(root, 'App.tsx'), 'utf8')).toContain("lazy(() => import('./pages/Live.tsx'))");
   });
@@ -26,9 +26,19 @@ describe('offline review surface source boundaries', () => {
   });
   it('keeps supplied block-causing findings visible and resolves stored evidence pointers', () => {
     const findings = readFileSync(join(root, 'pages', 'Findings.tsx'), 'utf8');
-    expect(findings).toContain('comparison.findings.map('); expect(findings).toContain('finding.block_causing');
+    expect(findings).toContain('reviewItems(comparison).map('); expect(findings).toContain('finding.block_causing');
     const detail = readFileSync(join(root, 'pages', 'Finding.tsx'), 'utf8');
     expect(detail).toContain('resolvePointer(pointer, samples)');
     expect(detail).toContain('finding.original_severity'); expect(detail).toContain('finding.current_ruling');
+  });
+  it('routes semantic IDs through the same reasoned Demo and Live ruling flow', () => {
+    for (const page of ['Run.tsx', 'Live.tsx']) {
+      const source = readFileSync(join(root, 'pages', page), 'utf8');
+      expect(source).toContain('comparison?.semantic_reviews.find('); expect(source).toContain('<SemanticFinding ');
+      expect(source).toContain('finding_id'); expect(source).toContain('reason.trim()');
+    }
+    const detail = readFileSync(join(root, 'pages', 'SemanticFinding.tsx'), 'utf8');
+    expect(detail).toContain('<RulingButtons key={review.id} onRule={onRule} />');
+    expect(detail).toContain('Unsupported evidence still requires review after a ruling.');
   });
 });

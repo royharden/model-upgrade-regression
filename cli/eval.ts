@@ -13,13 +13,16 @@ import { calculateMetrics, proposalLines, renderResults, type BenchmarkReport } 
 import { classSupport, renderSupport } from '../src/core/regressdiff/benchmark/support.ts';
 import { parseRecordings } from '../src/lib/recordings.ts';
 import policy from '../fixtures/policy.json';
+import { evaluateSemanticFixtures, semanticEvaluationConfig, SemanticFixtureSchema, type SemanticFixture } from '../src/core/regressdiff/semantic/evaluation.ts';
 
 export const GENERATED_START = '<!-- benchmark-results:start -->';
 export const GENERATED_END = '<!-- benchmark-results:end -->';
 export interface EvalArgs { suite: string; old: string; out: string; seed: number; heldout: boolean; help: boolean }
 export const EVAL_HELP = `Usage: npm run eval -- [--heldout] [--suite PATH] [--old PATH] [--out DIR] [--seed INTEGER]
 Default: dev, fixtures/suite.demo.json, fixtures/recordings/old.jsonl, results/, seed 40.
-Recorded synthetic benchmark: k=1/5, all five methods. No provider/network calls.
+Recorded synthetic benchmark: k=1/5, all five methods; selected dev/heldout semantic fixtures.
+Both deterministic semantic baselines are evaluated; generative judge and Jev are not evaluated.
+No provider/network calls. Both fixture hashes and semantic versions bind the held-out configuration.
 Held-out reserves version/config before evaluation; a failed attempt cannot repeat.
 `;
 export function parseEvalArgs(argv: readonly string[]): EvalArgs {
@@ -82,20 +85,30 @@ export function updateGeneratedBlock(text: string, generated: string): string {
   if (start < 0 || end <= start || text.indexOf(GENERATED_START, start + GENERATED_START.length) >= 0 || text.indexOf(GENERATED_END, end + GENERATED_END.length) >= 0) throw new Error('README must have exactly one ordered benchmark generated marker pair');
   return `${text.slice(0, start + GENERATED_START.length)}\n\n${generated.trim()}\n\n${text.slice(end)}`;
 }
+/** Validate only the selected partition as evaluation input; hash both raw files in the frozen identity. */
+export function parseSemanticFixtureRows(text: string, split: 'dev' | 'heldout'): SemanticFixture[] {
+  const rows = text.split(/\r?\n/u).filter((line) => line.trim()).map((line) => SemanticFixtureSchema.parse(JSON.parse(line)));
+  if (!rows.length || rows.some((row) => row.split !== split)) throw new Error(`Semantic fixtures must contain only the selected ${split} partition`);
+  if (new Set(rows.map((row) => row.id)).size !== rows.length) throw new Error('Duplicate semantic fixture id');
+  return rows;
+}
 export async function main(argv: readonly string[], io: EvalIO = nodeIO): Promise<0 | 2> {
   let reservation: { path: string; event: HeldoutEvent } | null = null;
   try {
     const args = parseEvalArgs(argv);
     if (args.help) { io.stdout(EVAL_HELP); return 0; }
-    const [suiteText, oldText] = await Promise.all([io.readText(args.suite), io.readText(args.old)]);
+    const [suiteText, oldText, semanticDev, semanticHeldout] = await Promise.all([io.readText(args.suite), io.readText(args.old),
+      io.readText('fixtures/semantic/dev.jsonl'), io.readText('fixtures/semantic/heldout.jsonl')]);
     const suite = SuiteSchema.parse(JSON.parse(suiteText));
     const benchmark = buildBenchmark(suite, parseRecordings(oldText), { seed: args.seed });
     const partition = args.heldout ? 'heldout' as const : 'dev' as const, support = classSupport(benchmark.variants);
+    const semanticFixtures = parseSemanticFixtureRows(partition === 'dev' ? semanticDev : semanticHeldout, partition);
     // Print the full frozen inventory before executing any method/calculating any metric.
-    io.stdout(`${renderSupport(support, partition)}\n`);
+    io.stdout(`${renderSupport(support, partition)}\nSemantic fixture support: ${partition}, ${semanticFixtures.length} authored rows. Both deterministic baselines will report judged/abstained and per-class support; generative judge and Jev: not evaluated.\n`);
     const config_sha256 = sha256(canonical({ manifest: benchmark.manifest, methods: METHOD_IDS, methods_version: METHOD_VERSION, k: [1, 5],
       normalisation: NORMALISATION_VERSION, canonical: CANONICAL_VERSION, verdict: VERDICT_RULE_VERSION,
-      models: createManifest(suite, 'benchmark-config', { k: 5, old_model: 'mock:old', new_model: 'mock:new' }), policy }));
+      models: createManifest(suite, 'benchmark-config', { k: 5, old_model: 'mock:old', new_model: 'mock:new' }), policy,
+      semantic: { configuration: semanticEvaluationConfig(), fixture_sha256: { dev: sha256(semanticDev), heldout: sha256(semanticHeldout) } } }));
     const benchmark_version = benchmark.manifest.version;
     await io.ensureDirectory(args.out);
     if (args.heldout) {
@@ -106,11 +119,17 @@ export async function main(argv: readonly string[], io: EvalIO = nodeIO): Promis
       reservation = { path: 'results/heldout-run.log', event };
     }
     const results = runMethods(benchmark.variants.filter((variant) => variant.partition === partition)), metrics = calculateMetrics(results, support);
+    const semantic_evaluation = evaluateSemanticFixtures(semanticFixtures);
+    const baselineSummary = (id: string) => {
+      const row = semantic_evaluation.find((item) => item.id === id)!;
+      return row.status === 'not evaluated' ? 'not evaluated (disabled)' : `${row.metric}: ${row.value === null ? 'not evaluated' : row.value.toFixed(4)}; judged ${row.n}/${row.total}; abstentions ${row.abstentions}`;
+    };
     const report: BenchmarkReport = { schema_version: 'benchmark-results-v1', partition, benchmark_version, config_sha256, measured_at: io.now(),
       caveat: 'Author-built synthetic plants; descriptive Wilson intervals with variants clustered by base task. No real-world drift or live spend is measured.',
       support, metrics, proposals: proposalLines(metrics, partition), excluded_source_errors: benchmark.manifest.excluded_tasks.map((item) => ({
         task_id: item.task_id, error_samples: item.error_samples, accounting: item.expected_accounting, reason: item.reason })),
-      semantic: { key_token: 'pending M6 evaluation', refusal_style: 'pending M6 evaluation', generative_judge: 'not evaluated (disabled)', jev: 'not evaluated (disabled)' } };
+      semantic_evaluation, semantic_fixture_sha256: { dev: sha256(semanticDev), heldout: sha256(semanticHeldout) }, semantic_configuration: semanticEvaluationConfig(),
+      semantic: { key_token: baselineSummary('key-token-facts'), refusal_style: baselineSummary('refusal-style'), generative_judge: baselineSummary('generative-judge'), jev: baselineSummary('jev') } };
     const markdown = renderResults(report);
     await io.writeText(join(args.out, 'results.md'), markdown);
     await io.writeText(join(args.out, 'results.jsonl'), [{ type: 'summary', ...report }, ...results.map((result) => ({ type: 'variant', ...result }))].map((row) => JSON.stringify(row)).join('\n') + '\n');

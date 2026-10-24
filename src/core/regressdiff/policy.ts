@@ -3,6 +3,7 @@ import { PolicySchema, type Policy } from './schema/policy.ts';
 import type { RunManifest } from './schema/manifest.ts';
 import { measuredCost } from './checks/cost_budget.ts';
 import type { Cell, EvidenceFinding } from './findings.ts';
+import { semanticPending, type SemanticReview } from './semantic/slot.ts';
 
 export interface CapBreach { metric: 'cost_usd' | 'latency_ms'; scope: 'per_task_median' | 'suite_total'; task_id: string | null; measured: number; cap: number }
 export interface PolicyDecision {
@@ -10,7 +11,7 @@ export interface PolicyDecision {
   raw_policy: Policy; effective_policy: Policy & { waived_finding_ids: string[]; blocking_waivers_ignored: string[] };
   regressed_count: number; effective_regressed_count: number; block_causing_ids: string[]; cap_breaches: CapBreach[]; notes: string[];
 }
-export interface PolicyInput { policy?: unknown; manifest: RunManifest; cells: readonly Cell[]; findings: readonly EvidenceFinding[]; needs_review?: readonly { id: string }[] }
+export interface PolicyInput { policy?: unknown; manifest: RunManifest; cells: readonly Cell[]; findings: readonly EvidenceFinding[]; needs_review?: readonly { id: string }[]; semantic_reviews?: readonly SemanticReview[] }
 const median = (values: readonly number[]) => { const sorted = [...values].sort((a, b) => a - b), middle = Math.floor(sorted.length / 2); return sorted.length % 2 ? sorted[middle] : sorted[middle - 1] / 2 + sorted[middle] / 2; };
 export function evaluatePolicy(input: PolicyInput): PolicyDecision {
   const policy = PolicySchema.parse(input.policy ?? defaultPolicy), rules: string[] = [], notes: string[] = [];
@@ -60,9 +61,9 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
   if (hazards.length && policy.block_preexisting_hazards) addRule('B_PREEXISTING_HAZARD', hazards);
   const review: string[] = [];
   if (input.findings.some((finding) => finding.verdict === 'COULD_NOT_JUDGE')) review.push('R_COULD_NOT_JUDGE');
-  if (input.findings.some((finding) => finding.support === 'unsupported')) review.push('R_UNSUPPORTED');
-  if (input.needs_review?.length) review.push('R_NEEDS_REVIEW');
-  if (input.findings.some((finding) => finding.current_ruling?.kind === 'retest')) review.push('R_RETEST');
+  if (input.findings.some((finding) => finding.support === 'unsupported') || input.semantic_reviews?.some((item) => item.support === 'unsupported')) review.push('R_UNSUPPORTED');
+  if (input.needs_review?.length || input.semantic_reviews?.some(semanticPending)) review.push('R_NEEDS_REVIEW');
+  if (input.findings.some((finding) => finding.current_ruling?.kind === 'retest') || input.semantic_reviews?.some((item) => item.current_ruling?.kind === 'retest')) review.push('R_RETEST');
   if (effectiveRegressions.length) review.push('R_REGRESSED');
   if (hazards.length && !policy.block_preexisting_hazards) review.push('R_PREEXISTING_HAZARD');
   if (capUnavailable.length) { review.push('R_CAP_UNAVAILABLE'); notes.push(`Hard-cap measurements unavailable: ${capUnavailable.join(', ')}`); }

@@ -7,6 +7,7 @@ import type { MemoryStore } from '../../lib/store/memory.ts';
 import { demoSuite, runDemo, type DemoProgress } from '../../lib/demo.ts';
 import { Findings } from './Findings.tsx';
 import { Finding } from './Finding.tsx';
+import { SemanticFinding } from './SemanticFinding.tsx';
 import { Report } from './Report.tsx';
 import { CostBar } from '../components/CostBar.tsx';
 import { EstimatePanel } from '../components/EstimatePanel.tsx';
@@ -45,6 +46,7 @@ export function Run({ store }: { store: MemoryStore }) {
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Ruling could not be saved'); return false; }
   }
   const selected = comparison?.findings.find((finding) => finding.id === findingId);
+  const selectedSemantic = comparison?.semantic_reviews.find((review) => review.id === findingId);
   return <>
     <section className="panel">
       <h2>Choose the suite</h2>
@@ -71,6 +73,7 @@ export function Run({ store }: { store: MemoryStore }) {
     {error && <pre role="alert" className="error">{error}</pre>}
     {comparison && page === 'findings' && <Findings comparison={comparison} onOpen={(id) => { setFindingId(id); setPage('finding'); }} onReport={() => setPage('report')} />}
     {comparison && page === 'finding' && selected && <Finding finding={selected} onBack={() => setPage('findings')} onRule={(kind, reason) => rule(selected.id, kind, reason)} />}
+    {comparison && page === 'finding' && selectedSemantic && <SemanticFinding comparison={comparison} review={selectedSemantic} onBack={() => setPage('findings')} onRule={(kind, reason) => rule(selectedSemantic.id, kind, reason)} />}
     {comparison && page === 'report' && <Report comparison={comparison} onBack={() => setPage('findings')} />}
   </>;
 }

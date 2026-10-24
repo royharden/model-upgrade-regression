@@ -25,3 +25,7 @@ export * from './stats/index.ts';
 export * from './benchmark/methods.ts';
 export * from './benchmark/metrics.ts';
 export * from './benchmark/support.ts';
+export * from './semantic/baselines.ts';
+export * from './semantic/slot.ts';
+export * from './semantic/adapters.ts';
+export * from './semantic/evaluation.ts';

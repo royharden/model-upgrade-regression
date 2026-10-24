@@ -12,6 +12,7 @@ import { Auth } from './Auth.tsx';
 import { Recovery } from './Recovery.tsx';
 import { Findings } from './Findings.tsx';
 import { Finding } from './Finding.tsx';
+import { SemanticFinding } from './SemanticFinding.tsx';
 import { Report } from './Report.tsx';
 import { CostBar } from '../components/CostBar.tsx';
 import { EstimatePanel } from '../components/EstimatePanel.tsx';
@@ -113,6 +114,7 @@ function LiveRun({ client, owner }: { client: SupabaseClient; owner: string }) {
     } catch (failure) { setError(errorText(failure)); return false; }
   }
   const selected = comparison?.findings.find((finding) => finding.id === findingId);
+  const selectedSemantic = comparison?.semantic_reviews.find((review) => review.id === findingId);
   return <><section className="panel"><h2>Live comparison</h2><p>Signed in as {owner}</p>
     <button disabled={busy} onClick={() => perform(async () => { driver.pause(); const { error: signoutError } = await client.auth.signOut(); if (signoutError) throw new LiveError('signout_failed'); })}>Sign out</button>
     <p className="warning">Starting sends suite prompts, tool schemas and model outputs to the configured provider and stores evidence in your account. Tool calls are recorded as data. This browser dispatches at most two requests at once; closing or hiding it pauses new dispatch.</p>
@@ -156,5 +158,6 @@ function LiveRun({ client, owner }: { client: SupabaseClient; owner: string }) {
   </section>{error && <p role="alert">{error}</p>}
     {comparison && page === 'findings' && <Findings comparison={comparison} onOpen={(id) => { setFindingId(id); setPage('finding'); }} onReport={() => setPage('report')} />}
     {comparison && page === 'finding' && selected && <Finding finding={selected} onBack={() => setPage('findings')} onRule={rule} />}
+    {comparison && page === 'finding' && selectedSemantic && <SemanticFinding comparison={comparison} review={selectedSemantic} onBack={() => setPage('findings')} onRule={rule} />}
     {comparison && page === 'report' && <Report comparison={comparison} onBack={() => setPage('findings')} />}</>;
 }

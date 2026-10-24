@@ -19,6 +19,7 @@ export function Report({ comparison, onBack }: { comparison: Comparison; onBack:
   return <section className="panel" aria-labelledby="report-title"><button onClick={onBack}>← All findings</button>
     <h2 id="report-title">Migration report</h2><p><VerdictBadge verdict={decision.verdict} /> {decision.rules.join(' · ')}</p>
     <p>Policy exit {decision.exit_code}{decision.error_kind ? ` · ${decision.error_kind}` : ''}. This report is generated deterministically from stored samples and the ruling audit.</p>
+    <p>{comparison.semantic_reviews.length} semantic review items are included in both exports, with their baseline versions, observations, evidence support and ruling audit. Generative judge and Jev adapters are disabled and not evaluated.</p>
     <div className="actions"><button onClick={() => download(markdown, `${filename}.md`, 'text/markdown;charset=utf-8')}>Export Markdown</button>
       <button onClick={() => download(json, `${filename}.json`, 'application/json;charset=utf-8')}>Export JSON</button></div>
     <h3>Suite deltas and diagnostics</h3>

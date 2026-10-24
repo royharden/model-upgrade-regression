@@ -2,6 +2,7 @@ import { wilsonInterval, type WilsonInterval } from '../stats/wilson.ts';
 import { METHOD_IDS, type BenchmarkK, type MethodId, type MethodResult } from './methods.ts';
 import { renderSupport, type BenchmarkSupport } from './support.ts';
 import type { Variant } from './types.ts';
+import type { SemanticEvaluationRow } from '../semantic/evaluation.ts';
 
 export interface Rate { numerator: number; denominator: number; interval: WilsonInterval | null; status: 'evaluated' | 'not evaluated' }
 export interface NotApplicableRate { numerator: null; denominator: null; interval: null; status: 'N/A' }
@@ -19,6 +20,9 @@ export interface BenchmarkReport {
   caveat: string; support: BenchmarkSupport[]; metrics: MethodMetrics[]; proposals: string[];
   excluded_source_errors: { task_id: string; error_samples: number[]; accounting: 'COULD_NOT_JUDGE'; reason: string }[];
   semantic: { key_token: string; refusal_style: string; generative_judge: string; jev: string };
+  semantic_evaluation?: SemanticEvaluationRow[];
+  semantic_fixture_sha256?: { dev: string; heldout: string };
+  semantic_configuration?: ReturnType<typeof import('../semantic/evaluation.ts').semanticEvaluationConfig>;
 }
 const rate = (numerator: number, denominator: number): Rate => ({ numerator, denominator,
   interval: wilsonInterval(numerator, denominator), status: denominator ? 'evaluated' : 'not evaluated' });
@@ -86,5 +90,15 @@ export function renderResults(report: BenchmarkReport): string {
     ...report.metrics.flatMap((row) => row.failures).map((item) => `| ${item.reason} | ${item.variant_id} | ${item.task_id} | ${item.class_name} | ${item.method} | ${item.k} |`), '',
     '## Proposed acceptance and trade-offs', '', ...report.proposals.map((line) => `- ${line}`), '', '## Semantic slot', '',
     `Key-token baseline: ${report.semantic.key_token}. Refusal-style baseline: ${report.semantic.refusal_style}. Generative judge: ${report.semantic.generative_judge}. Jev: ${report.semantic.jev}.`, '');
+  if (report.semantic_fixture_sha256) lines.push(`Semantic fixture SHA-256: dev ${report.semantic_fixture_sha256.dev}; heldout ${report.semantic_fixture_sha256.heldout}.`, '');
+  for (const row of report.semantic_evaluation ?? []) {
+    lines.push(`### ${row.label}`, '', `Status: ${row.status}; ${row.metric ?? 'no metric'}: ${row.value === null ? 'not evaluated' : row.value.toFixed(4)}. Judged ${row.n}/${row.total}; abstentions ${row.abstentions}.`, '',
+      ...row.notes.map((note) => `- ${note}`), '');
+    if (row.status === 'evaluated') {
+      const interval = (value: WilsonInterval | null): string => value === null ? 'not evaluated' : `${value.successes}/${value.n} (Wilson 95% ${value.lower.toFixed(3)}–${value.upper.toFixed(3)})`;
+      lines.push('| Class | Actual support | Predicted support | TP / FP / FN / TN | Abstentions | Precision | Recall | F1 |', '| --- | --- | --- | --- | --- | --- | --- | --- |',
+        ...row.classes.map((item) => `| ${item.label} | ${item.actual_support} | ${item.predicted_support} | ${item.tp} / ${item.fp} / ${item.fn} / ${item.tn} | ${item.abstentions} | ${interval(item.precision)} | ${interval(item.recall)} | ${item.f1 === null ? 'not evaluated' : item.f1.toFixed(4)} |`), '');
+    }
+  }
   return lines.join('\n');
 }
