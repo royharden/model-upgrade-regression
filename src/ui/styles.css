@@ -1,0 +1,22 @@
+:root { font-family: system-ui, sans-serif; color: #1d2b39; background: #f3f6f8; line-height: 1.55; }
+body { margin: 0; }
+main { max-width: 1020px; margin: auto; padding: 2rem 1.2rem 4rem; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); line-height: 1.15; max-width: 760px; }
+.eyebrow { text-transform: uppercase; letter-spacing: .1em; font-size: .8rem; color: #35646e; }
+.banner { padding: .8rem 1rem; background: #dceee8; border: 1px solid #98c2ae; border-radius: .5rem; }
+.panel { padding: 1.4rem; margin: 1.4rem 0; background: white; border: 1px solid #d9e1e7; border-radius: .7rem; }
+button, select, input, textarea { font: inherit; }
+button { cursor: pointer; padding: .45rem .85rem; border: 1px solid #527383; border-radius: .35rem; background: #edf6f9; color: #153d50; }
+button:disabled { opacity: .55; cursor: default; }
+label { display: block; margin: .8rem 0; }
+input:not([type=checkbox]), textarea { display: block; max-width: 100%; box-sizing: border-box; padding: .4rem; }
+textarea { width: 100%; }
+progress { width: min(100%, 32rem); accent-color: #217c68; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.error, .warning { color: #8c311a; }
+.finding { border-left: 4px solid #768b9d; padding: .4rem 1rem 1rem; margin: 1rem 0; background: #f7fafb; overflow-wrap: anywhere; }
+.finding.regressed { border-color: #b64136; }
+.finding.could_not_judge { border-color: #bf8a19; }
+.finding.improved { border-color: #287d61; }
+footer { font-size: .85rem; color: #536675; }
+details { margin-top: 1rem; }
