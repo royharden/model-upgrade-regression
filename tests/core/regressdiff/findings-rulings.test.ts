@@ -109,6 +109,33 @@ describe('owner-scoped insert-only ruling replay', () => {
     expect(replayed.findings[0].original_severity).toBe('REGRESSED');
     expect(store.listSamples(run.id)).toEqual(samplesBefore);
   });
+  it.each([['fmt.prefix', false], ['tool.forbidden', true]] as const)('keeps the full order when waiving %s (blocking waivers=%s)', async (task_id, allow_waive_blocking) => {
+    const store = new MemoryStore(), { comparison, run } = await runDemo(demoSuite, args, store);
+    const input = { suite: demoSuite, args, samples: store.listSamples(run.id), run_id: run.id, owner_id: store.owner_id,
+      manifest: run.manifest, policy: { ...comparison.decision.raw_policy, allow_waive_blocking } };
+    const original = compare(input);
+    const prefix = original.findings.find((finding) => finding.task_id === 'fmt.prefix')!;
+    const thinking = original.findings.find((finding) => finding.task_id === 'con.thinking')!;
+    // Ordinary families oppose task-ID order: starts_with precedes thinking_leak, although fmt follows con.
+    expect([prefix, thinking].every((finding) => finding.verdict === 'REGRESSED' && !original.decision.raw_policy.always_blocking.includes(finding.check_type))).toBe(true);
+    expect(original.findings.filter((finding) => [prefix.id, thinking.id].includes(finding.id)).map((finding) => finding.task_id))
+      .toEqual(['fmt.prefix', 'con.thinking']);
+    const target = original.findings.find((finding) => finding.task_id === task_id)!;
+    expect(target.block_causing).toBe(true);
+    expect(original.decision.rules).toContain('B3');
+    const replayed = compare({ ...input, rulings: [event(target.id)] });
+    expect(replayed.findings.map((finding) => finding.id)).toEqual(original.findings.map((finding) => finding.id));
+    expect(replayed.report.findings.map((finding) => finding.id)).toEqual(original.report.findings.map((finding) => finding.id));
+    expect(replayed.decision).toMatchObject({ verdict: 'BLOCK', regressed_count: original.decision.regressed_count,
+      effective_regressed_count: original.decision.effective_regressed_count - 1 });
+    expect(replayed.decision.rules).toContain('B3');
+    expect(replayed.decision.block_causing_ids).not.toContain(target.id);
+    expect(replayed.decision.block_causing_ids).toContain(thinking.id);
+    const waived = replayed.findings.find((finding) => finding.id === target.id)!;
+    expect(waived).toMatchObject({ block_causing: false, verdict: 'REGRESSED', original_severity: 'REGRESSED', current_ruling: { kind: 'waived' } });
+    expect(waived.evidence).toEqual(target.evidence);
+    expect(waived.pointers).toEqual(target.pointers);
+  });
   it('elevates unresolved retest without demoting the original regression severity', async () => {
     const { comparison } = await runDemo(demoSuite, args, new MemoryStore());
     const improved = comparison.findings.find((finding) => finding.verdict === 'IMPROVED')!;

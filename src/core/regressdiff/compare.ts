@@ -9,12 +9,17 @@ import { runCheck } from './checks/index.ts';
 import type { CheckResult } from './evidence.ts';
 import { pairSamples, type Sample } from './pairing.ts';
 import { cellVerdict, VERDICT_RULE_VERSION } from './verdict.ts';
-import { findingsFromCells, type Cell, type Finding } from './findings.ts';
+import { attachEvidence, findingsFromCells, type Cell, type EvidenceFinding } from './findings.ts';
 import { replayRulings, type RulingEvent } from './rulings.ts';
 import { sortFindings } from './sort.ts';
+import { calculateSuiteStatistics, type SuiteStatistics } from './stats/index.ts';
+import { evaluatePolicy, type PolicyDecision } from './policy.ts';
+import { createReport, type MigrationReport } from './report/json.ts';
+import defaultPolicy from '../../../fixtures/policy.json';
+import { PolicySchema } from './schema/policy.ts';
 
-export interface CompareInput { suite: unknown; samples: readonly Sample[]; run_id: string; args: RunArgs; owner_id: string; rulings?: readonly RulingEvent[]; manifest?: RunManifest }
-export interface Comparison { suite: Suite; manifest: RunManifest; cells: Cell[]; findings: Finding[]; orphaned_rulings: RulingEvent[]; ruling_audit: RulingEvent[] }
+export interface CompareInput { suite: unknown; samples: readonly Sample[]; run_id: string; args: RunArgs; owner_id: string; rulings?: readonly RulingEvent[]; manifest?: RunManifest; policy?: unknown }
+export interface Comparison { suite: Suite; manifest: RunManifest; cells: Cell[]; findings: EvidenceFinding[]; orphaned_rulings: RulingEvent[]; ruling_audit: RulingEvent[]; stats: SuiteStatistics; decision: PolicyDecision; report: MigrationReport }
 export function createManifest(suite: Suite, run_id: string, args: RunArgs): RunManifest {
   const config = ModelsSchema.parse(modelsJson);
   const old = config.models.find((model) => model.id === args.old_model), next = config.models.find((model) => model.id === args.new_model);
@@ -28,6 +33,7 @@ function recordedError(sample: Sample): CheckResult {
 }
 export function compare(input: CompareInput): Comparison {
   const suite = SuiteSchema.parse(input.suite), args = RunArgsSchema.parse(input.args);
+  const policy = PolicySchema.parse(input.policy ?? defaultPolicy);
   const manifest = input.manifest ? RunManifestSchema.parse(input.manifest) : createManifest(suite, input.run_id, args);
   if (manifest.run_id !== input.run_id || manifest.k !== args.k || manifest.old_model.id !== args.old_model || manifest.new_model.id !== args.new_model ||
     manifest.suite_sha256 !== sha256(canonical(suite)) || manifest.normalisation_version !== NORMALISATION_VERSION ||
@@ -42,7 +48,19 @@ export function compare(input: CompareInput): Comparison {
     cells.push({ task_id: pair.task.id, check_id: check.id, check_type: check.type, check, old_results, new_results,
       ...cellVerdict(old_results.map(({ result }) => result.status), new_results.map(({ result }) => result.status), args.k) });
   }
-  const findings = findingsFromCells(cells), replay = replayRulings(input.owner_id, findings.map((finding) => finding.id), input.rulings ?? []);
-  return { suite, manifest, cells, findings: sortFindings(findings.map((finding) => ({ ...finding, current_ruling: replay.effective[finding.id] ?? null }))),
-    orphaned_rulings: replay.orphaned, ruling_audit: replay.audit };
+  // Even an UNCHANGED noisy cell can carry a new-side always-blocking hazard (B2).
+  const base = findingsFromCells(cells, true).filter((finding) => finding.verdict !== 'UNCHANGED' ||
+    (policy.always_blocking.includes(finding.check_type) && finding.cell.new_counts.fail > 0 &&
+      finding.cell.old_counts.pass * 2 > finding.cell.old_counts.pass + finding.cell.old_counts.fail));
+  const replay = replayRulings(input.owner_id, base.map((finding) => finding.id), input.rulings ?? []);
+  const evidenced = base.map((finding) => attachEvidence({ ...finding, current_ruling: replay.effective[finding.id] ?? null }));
+  const stats = calculateSuiteStatistics({ suite, manifest, cells });
+  const decision = evaluatePolicy({ policy, manifest, cells, findings: evidenced });
+  const blockCausing = new Set(decision.block_causing_ids);
+  // Waivers change effective policy/badges, while ranking retains the unwaived blocking priority.
+  const orderingBlockCausing = new Set(evaluatePolicy({ policy, manifest, cells,
+    findings: evidenced.map((finding) => ({ ...finding, current_ruling: null })) }).block_causing_ids);
+  const findings = sortFindings(evidenced.map((finding) => ({ ...finding, block_causing: blockCausing.has(finding.id) })), decision.raw_policy.always_blocking, orderingBlockCausing);
+  const report = createReport({ manifest, stats, decision, findings, cells, orphaned_rulings: replay.orphaned, ruling_audit: replay.audit });
+  return { suite, manifest, cells, findings, stats, decision, report, orphaned_rulings: replay.orphaned, ruling_audit: replay.audit };
 }
