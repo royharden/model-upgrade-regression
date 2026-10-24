@@ -27,6 +27,7 @@ export function estimateSpend(model: Model, request: EstimateInput): SpendEstima
   const input = bytes(request.serialized_request) + request.message_count * model.per_message_overhead_bound;
   const output = model.max_tokens + (model.billing.reasoning_counts_in_max_tokens ? 0 : model.reasoning_budget);
   // Separately billed reasoning must be bounded too. Use the highest output-side rate conservatively.
+  if (prices.reasoning_in_output_tokens === false && prices.reasoning_per_mtok === undefined) return { status: 'unavailable', reason: 'reasoning billing rate unavailable' };
   if (prices.reasoning_per_mtok !== undefined && !nonnegative(prices.reasoning_per_mtok)) return { status: 'unavailable', reason: 'reasoning billing rate unavailable' };
   const usd = (input * Math.max(...inputRates) + output * Math.max(prices.output_per_mtok, prices.reasoning_per_mtok ?? 0)) / 1_000_000;
   return Number.isFinite(usd)

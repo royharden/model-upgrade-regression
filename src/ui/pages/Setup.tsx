@@ -4,6 +4,6 @@ export function Setup({ onDemo }: { onDemo: () => void }) {
     <p>Compare 40 synthetic tasks across two recorded models. Outputs, proposed tool calls and errors are replayed locally.</p>
     <p>No API key or sign-in is needed. The demo stores evidence and rulings for this session.</p>
     <button onClick={onDemo}>Demo</button>
-    <p>Live mode is pending backend provisioning and verified model prices.</p>
+    <p>Select Live separately for connection setup and sign-in. Live calls require backend provisioning, an owner allowlist grant, your spend cap and verified model prices.</p>
   </section>;
 }

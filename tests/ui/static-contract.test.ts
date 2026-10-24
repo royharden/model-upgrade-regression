@@ -13,7 +13,10 @@ describe('offline review surface source boundaries', () => {
     // A model can emit HTML, fake pointers or report-shaped JSON; source data must remain React text.
     const source = sources(root).join('\n');
     expect(source).not.toMatch(/dangerouslySetInnerHTML|\.innerHTML\s*=|\beval\s*\(/u);
-    expect(source).not.toMatch(/\bfetch\s*\(|from\s+['"][^'"]*supabase/u);
+    const offline = ['App.tsx', 'pages/Setup.tsx', 'pages/Run.tsx', 'pages/Findings.tsx', 'pages/Finding.tsx', 'pages/Report.tsx',
+      'components/CostBar.tsx', 'components/EstimatePanel.tsx', 'components/RulingButtons.tsx'].map((path) => readFileSync(join(root, path), 'utf8')).join('\n');
+    expect(offline).not.toMatch(/\bfetch\s*\(|from\s+['"][^'"]*supabase/u);
+    expect(readFileSync(join(root, 'App.tsx'), 'utf8')).toContain("lazy(() => import('./pages/Live.tsx'))");
   });
   it('retains suite paste/upload validation and uses shared core report exports', () => {
     const run = readFileSync(join(root, 'pages', 'Run.tsx'), 'utf8');

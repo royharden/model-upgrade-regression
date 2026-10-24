@@ -6,7 +6,7 @@ import { VerdictBadge } from '../components/VerdictBadge.tsx';
 
 export function Finding({ finding, onBack, onRule }: {
   finding: Comparison['findings'][number]; onBack: () => void;
-  onRule: (kind: ReviewRulingKind, reason: string) => boolean;
+  onRule: (kind: ReviewRulingKind, reason: string) => boolean | Promise<boolean>;
 }) {
   const samples = [...finding.evidence.old, ...finding.evidence.new].map(({ sample }) => sample);
   return <section className="panel" aria-labelledby="finding-title"><button onClick={onBack}>← All findings</button>
