@@ -1,0 +1,6 @@
+project_id = "model-upgrade-regression"
+
+[functions.run-task]
+verify_jwt = true
+import_map = "./functions/run-task/deno.json"
+entrypoint = "./functions/run-task/index.ts"

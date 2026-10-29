@@ -1,0 +1,27 @@
+# Limitations and unverified behavior
+
+This is source construction under Dirty Mode. Dependencies have never been installed; no lockfile has been generated; typecheck, lint, tests, builds, the Demo/CLI, benchmark evaluation, Deno, database migrations, browser journeys and deployed calls have never run. Source inspection and stripped-module parsing are the only validation performed. Consult [DEFERRED-VALIDATION.md](DEFERRED-VALIDATION.md) before activation.
+
+## Detection boundaries
+
+Deterministic checks enforce declared observable constraints. They can miss a lost fact, a tone shift or a subtly wrong number when the suite lacks an exact constraint for it. Passing checks or a SAFE_WITH_NOTES decision are not a general quality, safety or migration guarantee. Small k values and the fixed noise floor can hide genuine changes; errors remain uncertain rather than reducing the denominator. Statistical diagnostics are descriptive and never rewrite verdicts.
+
+The thinking-leak check uses configured tags and copied contiguous spans. Boilerplate shared between thinking and final output can produce heuristic false positives; rephrased leakage can be missed. It is not an information-flow proof. Text matching is lexical, and the regex guard accepts a deliberately restricted subset rather than proving general ReDoS safety. Runtime engine/version behavior, input bounds and adversarial patterns still require validation.
+
+The semantic key-token baseline tests presence of versioned lexical tokens. Negation, wrong relationships, reordered meanings and subtly wrong numbers can retain those tokens; synonyms and valid paraphrases can omit them. Stop-word-only facts can be unjudgeable. Refusal style uses a versioned phrase inventory and known stop reasons: quoted refusal phrases can create false positives; indirect or hedged refusals and mixed answers can be missed. These baselines cannot establish factual entailment or tone equivalence. Their observations live only in a separate NEEDS_REVIEW bucket; human confirmation is a ruling on the evidence, not a proof of semantic correctness.
+
+Generative judge and Jev are disabled typed interfaces with no executable integration. Neither has been evaluated; model identity/capabilities, live documentation, credentials, privacy, costs, prompt-injection resistance and metric validation must be checked in a later authorized phase. No optional model claim should be inferred from source interfaces or a pinned design label.
+
+## Evidence and benchmark limits
+
+Pointers are generated from canonical stored samples, never supplied by model text. A supported pointer proves the quote/anchor, view hash and location against the sample; it does not prove that the content is true or that a check is sufficient. A recorded-error pointer proves unavailability, not answer content. A waiver never repairs unsupported evidence. Model text and report-like instructions are untrusted data; UI and Markdown escaping paths still need the deferred runtime/browser checks.
+
+The benchmark and semantic labels are author-built synthetic fixtures. Variants are clustered by base task, so Wilson intervals are descriptive and do not turn correlated variants into independent trials. Class/task support gaps and unavailable denominators must be shown explicitly. Planted detection and false-alarm behavior measure wiring on those fixtures, not representative model drift, domain correctness, live provider reliability or live spend. No dev, held-out, semantic, generative-judge or Jev scores have been measured; no performance or superiority claim is made. The once-per-version/config guard prevents a repeat of that frozen local identity, not experiment gaming through intentional source/config changes.
+
+## Live accounting and execution limits
+
+Canonical usage cannot represent every provider cache-write, special or separate-reasoning billing breakdown. It may be null while raw provider evidence is retained; cost checks and aggregates then abstain. The actual ledger independently settles a known bill when its billing schema and rates suffice, including a known bill on malformed/unnormalisable output. Unknown counts/rates or unmodelled categories retain unknown liability and its reservation; they are never assumed free. Shipped live model entries have no verified prices/IDs and are disabled. Actual prices, capability bounds, raw usage schemas and reasoning/cache treatment still require owner verification and capped integration checks.
+
+The Live browser driver is a foreground queue, not a durable worker. Pause, hide, close or owner change stops new dispatch, but accepted calls may finish. Stored errors are terminal immutable samples; retest requires a new run. Loading evidence does not dispatch. A fresh missing-sample retry can incur another bill while earlier unknown liability remains reserved. Auth lifecycle, late replies, concurrency races and these async compositions are unverified.
+
+Deno dependency/import resolution and deployment of cross-directory core modules are unverified. The five SQL migrations, actual auth/gateway/key compatibility, anon/two-user RLS isolation, transactional caps, concurrent claim/dispatch/settle/reconcile behavior, allowlisted egress, secret setup, recovery redirects and hosted round trips have not been exercised. The intended Bolt Database has no known applied baseline. A prepared handoff is not deployed infrastructure, and a frontend build will not close these backend gates.

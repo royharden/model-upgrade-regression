@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.47.10",
+    "zod": "npm:zod@3.24.1",
+    "ajv": "npm:ajv@8.17.1",
+    "@noble/hashes/sha256": "npm:@noble/hashes@1.6.1/sha256",
+    "@noble/hashes/utils": "npm:@noble/hashes@1.6.1/utils"
+  }
+}

@@ -6,7 +6,7 @@ export const PriceSchema = z.object({
   reasoning_per_mtok: z.number().finite().nonnegative().optional(), reasoning_in_output_tokens: z.boolean().optional(),
   cache_write_per_mtok: z.number().finite().nonnegative().optional(), special_input_per_mtok: z.number().finite().nonnegative().optional(),
 }).strict();
-/** Dependency-free portable/types.ts becomes the canonical mirror contract in M2. */
+/** Zod runtime mirror of canonical supabase/functions/run-task/portable/types.ts. */
 export const ModelSchema = z.object({
   id: z.string().min(1), provider: z.enum(['mock', 'anthropic', 'openai_compatible']),
   prices: PriceSchema.nullable(), check_prices: PriceSchema.nullable(), spend_usd_per_call: z.number().finite().nonnegative().optional(),

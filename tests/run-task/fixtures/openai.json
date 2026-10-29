@@ -1,0 +1,11 @@
+{
+  "id": "synthetic-completion",
+  "choices": [{
+    "message": {
+      "role": "assistant", "content": "OK", "reasoning_content": "private synthetic rationale",
+      "tool_calls": [{ "id": "ignored-provider-id", "type": "function", "function": { "name": "lookup", "arguments": "{\"z\":2,\"a\":1}" } }]
+    },
+    "finish_reason": "tool_calls"
+  }],
+  "usage": { "prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30, "completion_tokens_details": { "reasoning_tokens": 5 } }
+}

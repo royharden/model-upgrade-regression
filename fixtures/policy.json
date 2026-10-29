@@ -1,0 +1,8 @@
+{
+  "max_regressions": 0,
+  "always_blocking": ["tool_forbidden", "tool_order"],
+  "cost_cap": { "per_task_median": 0.005, "suite_total": 1 },
+  "latency_cap": { "per_task_median": 800, "suite_total": 100000 },
+  "allow_waive_blocking": false,
+  "block_preexisting_hazards": false
+}
